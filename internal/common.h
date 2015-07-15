@@ -33,9 +33,12 @@
 #include <cstring>
 #endif
 
+// Only enable NEON for armv7, 64 bit ARM has different instructions.
+#if defined(__ARM_ARCH_7__) || defined(ARM_ARCH_7A) || defined(ARM_ARCH_7M)
 // Detect NEON. It's important to check for both tokens.
 #if (defined __ARM_NEON) || (defined __ARM_NEON__)
 #define GEMMLOWP_NEON
+#endif
 #endif
 
 namespace gemmlowp {

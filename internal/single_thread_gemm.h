@@ -21,12 +21,12 @@
 
 #include <cassert>
 
-#include "public/map.h"
-#include "internal/allocator.h"
-#include "internal/pack.h"
-#include "internal/unpack.h"
-#include "internal/compute.h"
-#include "internal/kernel.h"
+#include "../public/map.h"
+#include "allocator.h"
+#include "pack.h"
+#include "unpack.h"
+#include "compute.h"
+#include "kernel.h"
 
 namespace gemmlowp {
 
@@ -90,8 +90,10 @@ void SingleThreadGemm(SingleThreadGemmContext* context,
       Compute(kernel, block_params, &packed_result, packed_lhs, packed_rhs);
 
       auto result_block = result->block(r, c, rs, cs);
-      UnpackResult(&result_block, packed_result, packed_lhs, packed_rhs, depth,
-                   result_offset, result_mult_int, result_shift);
+      UnpackResult(&result_block, packed_result, depth,
+                   packed_lhs.rank_one_update(), packed_rhs.rank_one_update(),
+                   lhs_offset, rhs_offset, result_offset, result_mult_int,
+                   result_shift);
     }
   }
 

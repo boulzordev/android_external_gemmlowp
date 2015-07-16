@@ -19,14 +19,15 @@
 
 #ifdef GEMMLOWP_TEST_PROFILE
 #define GEMMLOWP_PROFILING
-#include "profiling/profiler.h"
+#include "../profiling/profiler.h"
 #endif
 
 #include <iostream>
 #include <cstdlib>
 #include <vector>
+#include <cstring>
 
-#include "public/map.h"
+#include "../public/map.h"
 
 namespace gemmlowp {
 
@@ -46,6 +47,7 @@ class Matrix : public MatrixMap<tScalar, tOrder> {
   typedef MatrixMap<tScalar, tOrder> Map;
   typedef MatrixMap<const tScalar, tOrder> ConstMap;
   typedef typename Map::Scalar Scalar;
+  static const MapOrder Order = tOrder;
   using Map::kOrder;
   using Map::rows_;
   using Map::cols_;
@@ -61,13 +63,13 @@ class Matrix : public MatrixMap<tScalar, tOrder> {
 
   Matrix& operator=(const Matrix& other) {
     Resize(other.rows_, other.cols_);
-    memcpy(data_, other.data_, size() * sizeof(Scalar));
+    std::memcpy(data_, other.data_, size() * sizeof(Scalar));
     return *this;
   }
 
   friend bool operator==(const Matrix& a, const Matrix& b) {
     return a.rows_ == b.rows_ && a.cols_ == b.cols_ &&
-           !memcmp(a.data_, b.data_, a.size());
+           !std::memcmp(a.data_, b.data_, a.size());
   }
 
   void Resize(int rows, int cols) {

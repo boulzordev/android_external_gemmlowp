@@ -25,7 +25,7 @@
 #include <cstdlib>
 #include <algorithm>
 
-#include "profiling/instrumentation.h"
+#include "../profiling/instrumentation.h"
 
 #ifdef GEMMLOWP_PROFILING
 #include <set>
@@ -33,11 +33,14 @@
 #include <cstring>
 #endif
 
-// Only enable NEON for armv7, 64 bit ARM has different instructions.
-#if defined(__ARM_ARCH_7__) || defined(ARM_ARCH_7A) || defined(ARM_ARCH_7M)
 // Detect NEON. It's important to check for both tokens.
 #if (defined __ARM_NEON) || (defined __ARM_NEON__)
 #define GEMMLOWP_NEON
+#ifdef __arm__
+#define GEMMLOWP_NEON32
+#endif
+#ifdef __aarch64__
+#define GEMMLOWP_NEON64
 #endif
 #endif
 

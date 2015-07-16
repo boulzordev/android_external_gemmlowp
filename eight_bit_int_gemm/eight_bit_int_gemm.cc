@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "eight_bit_int_gemm/eight_bit_int_gemm.h"
+#include "eight_bit_int_gemm.h"
 
 // gemmlowp symbols should have hidden visibility.
 // currently this is ensured in the build system by
 // passing -finlines-visibility-hidden. TODO: it would be
 // safer to hardcode it here with some #pragma's.
-#include "public/gemmlowp.h"
+#include "../public/gemmlowp.h"
 
 namespace gemmlowp {
 
@@ -47,11 +47,40 @@ void DestroyGlobalContext() {
   global_context = nullptr;
 }
 
+template <bool transpose_a, bool transpose_b, bool transpose_c>
+void EightBitIntGemmImpl(GemmContext* context, int m, int n, int k,
+                         const std::uint8_t* a, std::int32_t a_offset, int lda,
+                         const std::uint8_t* b, std::int32_t b_offset, int ldb,
+                         std::uint8_t* c, std::int32_t c_offset,
+                         std::int32_t c_mult_int, std::int32_t c_shift,
+                         int ldc) {
+  const int lhs_offset = b_offset;
+  const int rhs_offset = a_offset;
+  const int result_offset = c_offset;
+  const int result_mult_int = c_mult_int;
+  const int result_shift = c_shift;
+
+  static const MapOrder ResultOrder =
+      transpose_c ? MapOrder::ColMajor : MapOrder::RowMajor;
+  static const MapOrder LhsOrder =
+      transpose_b == transpose_c ? MapOrder::RowMajor : MapOrder::ColMajor;
+  static const MapOrder RhsOrder =
+      transpose_a == transpose_c ? MapOrder::RowMajor : MapOrder::ColMajor;
+
+  MatrixMap<const std::uint8_t, LhsOrder> lhs(b, n, k, ldb);
+  MatrixMap<const std::uint8_t, RhsOrder> rhs(a, k, m, lda);
+  MatrixMap<std::uint8_t, ResultOrder> result(c, n, m, ldc);
+
+  Gemm(context, lhs, rhs, &result, lhs_offset, rhs_offset, result_offset,
+       result_mult_int, result_shift);
+}
+
 }  // end anonymous namespace
 
 // Public interface entry points
 
-void EightBitIntGemm(int m, int n, int k, const std::uint8_t* a,
+void EightBitIntGemm(bool transpose_a, bool transpose_b, bool transpose_c,
+                     int m, int n, int k, const std::uint8_t* a,
                      std::int32_t a_offset, int lda, const std::uint8_t* b,
                      std::int32_t b_offset, int ldb, std::uint8_t* c,
                      std::int32_t c_offset, std::int32_t c_mult_int,
@@ -59,18 +88,23 @@ void EightBitIntGemm(int m, int n, int k, const std::uint8_t* a,
   AutoGlobalLock<EightBitIntGemmLockId> lock;
   GemmContext* context = GetOrCreateGlobalContext();
 
-  MatrixMap<const std::uint8_t, MapOrder::RowMajor> lhs(b, n, k, ldb);
-  MatrixMap<const std::uint8_t, MapOrder::ColMajor> rhs(a, k, m, lda);
-  MatrixMap<std::uint8_t, MapOrder::ColMajor> result(c, n, m, ldc);
+#define GEMMLOWP_HANDLE_CASE(ta, tb, tc)                                    \
+  if (transpose_a == ta && transpose_b == tb && transpose_c == tc) {        \
+    EightBitIntGemmImpl<ta, tb, tc>(context, m, n, k, a, a_offset, lda, b,  \
+                                    b_offset, ldb, c, c_offset, c_mult_int, \
+                                    c_shift, ldc);                          \
+  }
 
-  const int lhs_offset = b_offset;
-  const int rhs_offset = a_offset;
-  const int result_offset = c_offset;
-  const int result_mult_int = c_mult_int;
-  const int result_shift = c_shift;
+  GEMMLOWP_HANDLE_CASE(false, false, false)
+  GEMMLOWP_HANDLE_CASE(false, false, true)
+  GEMMLOWP_HANDLE_CASE(false, true, false)
+  GEMMLOWP_HANDLE_CASE(false, true, true)
+  GEMMLOWP_HANDLE_CASE(true, false, false)
+  GEMMLOWP_HANDLE_CASE(true, false, true)
+  GEMMLOWP_HANDLE_CASE(true, true, false)
+  GEMMLOWP_HANDLE_CASE(true, true, true)
 
-  Gemm(context, lhs, rhs, &result, lhs_offset, rhs_offset, result_offset,
-       result_mult_int, result_shift);
+#undef GEMMLOWP_HANDLE_CASE
 }
 
 void SetMaxNumThreads(int n) {

@@ -37,6 +37,11 @@ LOCAL_SRC_FILES:= eight_bit_int_gemm.cc
 
 LOCAL_CFLAGS += -no-integrated-as -std=c++11
 LOCAL_CFLAGS += -DGEMMLOWP_USE_OLD_ANDROID_SDK
+# Use the NOEN path of gemmlowp for RS support lib.
+# Alternative non-NEON version already in support lib runtime.
+ifeq ($(ARCH_ARM_HAVE_ARMV7A),true)
+LOCAL_CFLAGS_arm := -D__ARM_NEON__ -mfpu=neon
+endif
 LOCAL_C_INCLUDES += external/gemmlowp/
 LOCAL_NDK_STL_VARIANT := stlport_static
 
